@@ -130,7 +130,7 @@ static esp_err_t esp_websocket_client_dispatch_event(esp_websocket_client_handle
 static esp_err_t esp_websocket_client_abort_connection(esp_websocket_client_handle_t client)
 {
     esp_transport_close(client->transport);
-    client->wait_timeout_ms = WEBSOCKET_RECONNECT_TIMEOUT_MS;
+//    client->wait_timeout_ms = WEBSOCKET_RECONNECT_TIMEOUT_MS;
     client->reconnect_tick_ms = _tick_get_ms();
     client->state = WEBSOCKET_STATE_WAIT_TIMEOUT;
     ESP_LOGI(TAG, "Reconnect after %d ms", client->wait_timeout_ms);
@@ -187,7 +187,6 @@ static esp_err_t esp_websocket_client_set_config(esp_websocket_client_handle_t c
         cfg->subprotocol = strdup(config->subprotocol);
         ESP_WS_CLIENT_MEM_CHECK(TAG, cfg->subprotocol, return ESP_ERR_NO_MEM);
     }
-
     cfg->network_timeout_ms = WEBSOCKET_NETWORK_TIMEOUT_MS;
     cfg->user_context = config->user_context;
     cfg->auto_reconnect = true;
@@ -317,6 +316,10 @@ esp_websocket_client_handle_t esp_websocket_client_init(const esp_websocket_clie
     client->reconnect_tick_ms = _tick_get_ms();
     client->ping_tick_ms = _tick_get_ms();
 
+    if(config->reconect_interval > 0)
+    	client->wait_timeout_ms = config->reconect_interval;
+    else
+    	client->wait_timeout_ms = WEBSOCKET_RECONNECT_TIMEOUT_MS;
     int buffer_size = config->buffer_size;
     if (buffer_size <= 0) {
         buffer_size = WEBSOCKET_BUFFER_SIZE_BYTE;
