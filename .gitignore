@@ -2,6 +2,8 @@
 *.o
 *.pyc
 
+.sc*
+
 # gtags
 GTAGS
 GRTAGS
