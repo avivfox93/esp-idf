@@ -2,7 +2,7 @@
 *.o
 *.pyc
 
-.sc*
+components/**/.sc*.c
 
 # gtags
 GTAGS
