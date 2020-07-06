@@ -316,8 +316,8 @@ esp_websocket_client_handle_t esp_websocket_client_init(const esp_websocket_clie
     client->reconnect_tick_ms = _tick_get_ms();
     client->ping_tick_ms = _tick_get_ms();
 
-    if(config->reconect_interval > 0)
-    	client->wait_timeout_ms = config->reconect_interval;
+    if(config->wait_timeout_ms > 0)
+    	client->wait_timeout_ms = config->wait_timeout_ms;
     else
     	client->wait_timeout_ms = WEBSOCKET_RECONNECT_TIMEOUT_MS;
     int buffer_size = config->buffer_size;
