@@ -117,6 +117,11 @@ struct object { long placeholder[ 10 ]; };
 void __register_frame_info (const void *begin, struct object *ob);
 extern char __eh_frame[];
 
+#ifdef CONFIG_COMPILER_CXX_EXCEPTIONS
+// workaround for C++ exception large memory allocation
+void _Unwind_SetEnableExceptionFdeSorting(unsigned char enable);
+#endif // CONFIG_COMPILER_CXX_EXCEPTIONS
+
 //If CONFIG_SPIRAM_IGNORE_NOTFOUND is set and external RAM is not found or errors out on testing, this is set to false.
 static bool s_spiram_okay=true;
 
@@ -172,7 +177,6 @@ void IRAM_ATTR call_start_cpu0(void)
     }
 
 #if CONFIG_SPIRAM_BOOT_INIT
-    esp_spiram_init_cache();
     if (esp_spiram_init() != ESP_OK) {
 #if CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY
         ESP_EARLY_LOGE(TAG, "Failed to init external RAM, needed for external .bss segment");
@@ -187,6 +191,7 @@ void IRAM_ATTR call_start_cpu0(void)
         abort();
 #endif
     }
+    esp_spiram_init_cache();
 #endif
 
     ESP_EARLY_LOGI(TAG, "Pro cpu up.");
@@ -218,10 +223,6 @@ void IRAM_ATTR call_start_cpu0(void)
         abort();
     }
     ESP_EARLY_LOGI(TAG, "Starting app cpu, entry point is %p", call_start_cpu1);
-
-#ifdef CONFIG_SECURE_FLASH_ENC_ENABLED
-    esp_flash_encryption_init_checks();
-#endif
 
     //Flush and enable icache for APP CPU
     Cache_Flush(1);
@@ -363,9 +364,7 @@ void start_cpu0_default(void)
 #if CONFIG_ESP32_BROWNOUT_DET
     esp_brownout_init();
 #endif
-#if CONFIG_ESP32_DISABLE_BASIC_ROM_CONSOLE
-    esp_efuse_disable_basic_rom_console();
-#endif
+
     rtc_gpio_force_hold_dis_all();
 
 #ifdef CONFIG_VFS_SUPPORT_IO
@@ -381,6 +380,17 @@ void start_cpu0_default(void)
 #else // defined(CONFIG_VFS_SUPPORT_IO) && !defined(CONFIG_ESP_CONSOLE_UART_NONE)
     _REENT_SMALL_CHECK_INIT(_GLOBAL_REENT);
 #endif // defined(CONFIG_VFS_SUPPORT_IO) && !defined(CONFIG_ESP_CONSOLE_UART_NONE)
+    // After setting _GLOBAL_REENT, ESP_LOGIx can be used instead of ESP_EARLY_LOGx.
+
+#ifdef CONFIG_SECURE_FLASH_ENC_ENABLED
+    esp_flash_encryption_init_checks();
+#endif
+#if CONFIG_ESP32_DISABLE_BASIC_ROM_CONSOLE
+    esp_efuse_disable_basic_rom_console();
+#endif
+#if CONFIG_SECURE_DISABLE_ROM_DL_MODE
+    esp_efuse_disable_rom_download_mode();
+#endif
 
     esp_timer_init();
     esp_set_time_from_rtc();
@@ -398,10 +408,20 @@ void start_cpu0_default(void)
     assert(err == ESP_OK && "Failed to init pthread module!");
 
     do_global_ctors();
+
+#ifdef CONFIG_COMPILER_CXX_EXCEPTIONS
+    ESP_EARLY_LOGD(TAG, "Setting C++ exception workarounds.");
+    _Unwind_SetEnableExceptionFdeSorting(0);
+#endif // CONFIG_COMPILER_CXX_EXCEPTIONS
+
 #if CONFIG_ESP_INT_WDT
     esp_int_wdt_init();
     //Initialize the interrupt watch dog for CPU0.
     esp_int_wdt_cpu_init();
+#else
+#if CONFIG_ESP32_ECO3_CACHE_LOCK_FIX
+    assert(!soc_has_cache_lock_bug() && "ESP32 Rev 3 + Dual Core + PSRAM requires INT WDT enabled in project config!");
+#endif
 #endif
     esp_cache_err_int_init();
     esp_crosscore_int_init();

@@ -155,16 +155,19 @@ def action_extensions(base_actions, project_path):
         """
         Execute openocd as external tool
         """
+        OPENOCD_TAGET_CONFIG = {
+            "esp32": "-f board/esp32-wrover-kit-3.3v.cfg",
+            "esp32s2": "-f board/esp32s2-kaluga-1.cfg",
+        }
         if os.getenv("OPENOCD_SCRIPTS") is None:
-            raise FatalError("OPENOCD_SCRIPTS not found in the environment: Please run export.sh/export.bin", ctx)
+            raise FatalError("OPENOCD_SCRIPTS not found in the environment: Please run export.sh/export.bat", ctx)
         openocd_arguments = os.getenv("OPENOCD_COMMANDS") if openocd_commands is None else openocd_commands
         project_desc = get_project_desc(args, ctx)
         if openocd_arguments is None:
             # use default value if commands not defined in the environment nor command line
-            if project_desc["target"] == "esp32":
-                openocd_arguments = "-f board/esp32-wrover-kit-3.3v.cfg"
-            else:
-                openocd_arguments = "-f interface/ftdi/esp32_devkitj_v1.cfg -f target/{}.cfg".format(project_desc["target"])
+            target = project_desc["target"]
+            default_args = "-f interface/ftdi/esp32_devkitj_v1.cfg -f target/{}.cfg".format(target)
+            openocd_arguments = OPENOCD_TAGET_CONFIG.get(target, default_args)
             print('Note: OpenOCD cfg not found (via env variable OPENOCD_COMMANDS nor as a --openocd-commands argument)\n'
                   'OpenOCD arguments default to: "{}"'.format(openocd_arguments))
         # script directory is taken from the environment by OpenOCD, update only if command line arguments to override
@@ -185,15 +188,16 @@ def action_extensions(base_actions, project_path):
         processes["openocd_outfile_name"] = openocd_out_name
         print("OpenOCD started as a background task {}".format(process.pid))
 
-    def gdbui(action, ctx, args, gdbgui_port, require_openocd):
+    def gdbui(action, ctx, args, gdbgui_port, gdbinit, require_openocd):
         """
         Asynchronous GDB-UI target
         """
         project_desc = get_project_desc(args, ctx)
         local_dir = project_desc["build_dir"]
         gdb = project_desc["monitor_toolprefix"] + "gdb"
-        gdbinit = os.path.join(local_dir, 'gdbinit')
-        create_local_gdbinit(gdbinit, os.path.join(args.build_dir, project_desc["app_elf"]))
+        if gdbinit is None:
+            gdbinit = os.path.join(local_dir, 'gdbinit')
+            create_local_gdbinit(gdbinit, os.path.join(args.build_dir, project_desc["app_elf"]))
         args = ["gdbgui", "-g", gdb, '--gdb-args="-x={}"'.format(gdbinit)]
         if gdbgui_port is not None:
             args += ["--port", gdbgui_port]
@@ -242,13 +246,13 @@ def action_extensions(base_actions, project_path):
         processes["gdb"] = p
         return p.wait()
 
-    def gdbtui(action, ctx, args, require_openocd):
+    def gdbtui(action, ctx, args, gdbinit, require_openocd):
         """
         Synchronous GDB target with text ui mode
         """
-        gdb(action, ctx, args, 1, require_openocd)
+        gdb(action, ctx, args, 1, gdbinit, require_openocd)
 
-    def gdb(action, ctx, args, gdb_tui, require_openocd):
+    def gdb(action, ctx, args, gdb_tui, gdbinit, require_openocd):
         """
         Synchronous GDB target
         """
@@ -266,8 +270,9 @@ def action_extensions(base_actions, project_path):
             raise FatalError("ELF file not found. You need to build & flash the project before running debug targets", ctx)
         gdb = project_desc["monitor_toolprefix"] + "gdb"
         local_dir = project_desc["build_dir"]
-        gdbinit = os.path.join(local_dir, 'gdbinit')
-        create_local_gdbinit(gdbinit, elf_file)
+        if gdbinit is None:
+            gdbinit = os.path.join(local_dir, 'gdbinit')
+            create_local_gdbinit(gdbinit, elf_file)
         args = [gdb, '-x={}'.format(gdbinit)]
         if gdb_tui is not None:
             args += ['-tui']
@@ -282,7 +287,11 @@ def action_extensions(base_actions, project_path):
                 continue
             finally:
                 watch_openocd.join()
-                processes["threads_to_join"].remove(watch_openocd)
+                try:
+                    processes["threads_to_join"].remove(watch_openocd)
+                except ValueError:
+                    # Valid scenario: watch_openocd task won't be in the list if openocd not started from idf.py
+                    pass
 
     fail_if_openocd_failed = {
         "names": ["--require-openocd", "--require_openocd"],
@@ -290,6 +299,11 @@ def action_extensions(base_actions, project_path):
         ("Fail this target if openocd (this targets dependency) failed.\n"),
         "is_flag": True,
         "default": False,
+    }
+    gdbinit = {
+        "names": ["--gdbinit"],
+        "help": ("Specify the name of gdbinit file to use\n"),
+        "default": None,
     }
     debug_actions = {
         "global_action_callbacks": [global_callback],
@@ -324,7 +338,7 @@ def action_extensions(base_actions, project_path):
                         ("run gdb in TUI mode\n"),
                         "default":
                         None,
-                    }, fail_if_openocd_failed
+                    }, gdbinit, fail_if_openocd_failed
                 ],
                 "order_dependencies": ["all", "flash"],
             },
@@ -338,14 +352,14 @@ def action_extensions(base_actions, project_path):
                         ("The port on which gdbgui will be hosted. Default: 5000\n"),
                         "default":
                         None,
-                    }, fail_if_openocd_failed
+                    }, gdbinit, fail_if_openocd_failed
                 ],
                 "order_dependencies": ["all", "flash"],
             },
             "gdbtui": {
                 "callback": gdbtui,
                 "help": "GDB TUI mode.",
-                "options": [fail_if_openocd_failed],
+                "options": [gdbinit, fail_if_openocd_failed],
                 "order_dependencies": ["all", "flash"],
             },
             "post_debug": {

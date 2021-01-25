@@ -110,6 +110,7 @@ typedef struct {
     const char                  *cert_pem;           /*!< SSL server certification, PEM format as string, if the client requires to verify server */
     const char                  *client_cert_pem;    /*!< SSL client certification, PEM format as string, if the server requires to verify client */
     const char                  *client_key_pem;     /*!< SSL client key, PEM format as string, if the server requires to verify client */
+    const char                  *user_agent;         /*!< The User Agent string to send with HTTP requests */
     esp_http_client_method_t    method;                   /*!< HTTP Method */
     int                         timeout_ms;               /*!< Network timeout in milliseconds */
     bool                        disable_auto_redirect;    /*!< Disable HTTP automatic redirects */
@@ -128,7 +129,11 @@ typedef struct {
  * Enum for the HTTP status codes.
  */
 typedef enum {
+    /* 2xx - Success */
+    HttpStatus_Ok                = 200,
+
     /* 3xx - Redirection */
+    HttpStatus_MultipleChoices   = 300,
     HttpStatus_MovedPermanently  = 301,
     HttpStatus_Found             = 302,
     HttpStatus_TemporaryRedirect = 307,
@@ -510,6 +515,20 @@ bool esp_http_client_is_complete_data_received(esp_http_client_handle_t client);
  */
 
 int esp_http_client_read_response(esp_http_client_handle_t client, char *buffer, int len);
+
+/**
+ * @brief          Get URL from client
+ *
+ * @param[in]      client   The esp_http_client handle
+ * @param[inout]   url      The buffer to store URL
+ * @param[in]      len      The buffer length
+ *
+ * @return
+ *     - ESP_OK
+ *     - ESP_FAIL
+ */
+
+esp_err_t esp_http_client_get_url(esp_http_client_handle_t client, char *url, const int len);
 
 #ifdef __cplusplus
 }

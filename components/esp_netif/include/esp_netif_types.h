@@ -73,6 +73,7 @@ typedef enum{
 
 /** @brief Supported options for DHCP client or DHCP server */
 typedef enum{
+    ESP_NETIF_SUBNET_MASK                   = 1,    /**< Network mask */
     ESP_NETIF_DOMAIN_NAME_SERVER            = 6,    /**< Domain name server */
     ESP_NETIF_ROUTER_SOLICITATION_ADDRESS   = 32,   /**< Solicitation router address */
     ESP_NETIF_REQUESTED_IP_ADDRESS          = 50,   /**< Request specific IP address */
@@ -183,6 +184,7 @@ typedef struct esp_netif_driver_base_s {
 struct esp_netif_driver_ifconfig {
     esp_netif_iodriver_handle handle;
     esp_err_t (*transmit)(void *h, void *buffer, size_t len);
+    esp_err_t (*transmit_wrap)(void *h, void *buffer, size_t len, void *netstack_buffer);
     void (*driver_free_rx_buffer)(void *h, void* buffer);
 };
 

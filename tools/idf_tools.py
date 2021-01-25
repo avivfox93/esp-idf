@@ -186,7 +186,7 @@ def run_cmd_check_output(cmd, input_text=None, extra_paths=None):
     try:
         if input_text:
             input_text = input_text.encode()
-        result = subprocess.run(cmd, capture_output=True, check=True, input=input_text)
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, input=input_text)
         return result.stdout + result.stderr
     except (AttributeError, TypeError):
         p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -857,7 +857,7 @@ def get_python_env_path():
             idf_version_str = version_file.read()
     else:
         try:
-            idf_version_str = subprocess.check_output(['git', 'describe', '--tags'],
+            idf_version_str = subprocess.check_output(['git', 'describe'],
                                                       cwd=global_idf_path, env=os.environ).decode()
         except subprocess.CalledProcessError as e:
             warn('Git describe was unsuccessul: {}'.format(e))

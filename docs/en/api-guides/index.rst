@@ -6,13 +6,14 @@ API Guides
     :maxdepth: 1
 
     Application Level Tracing <app_trace>
-    :esp32: BluFi <blufi>
+    :SOC_BT_SUPPORTED: BluFi <blufi>
     Bootloader <bootloader>
     Build System <build-system>
     :esp32: Build System (Legacy GNU Make) <build-system-legacy>
     Deep Sleep Wake Stubs <deep-sleep-stub>
+    :esp32s2: Device Firmware Upgrade through USB <dfu>
     Error Handling <error-handling>
-    :esp32: ESP-BLE-MESH <esp-ble-mesh/ble-mesh-index>
+    :SOC_BT_SUPPORTED: ESP-BLE-MESH <esp-ble-mesh/ble-mesh-index>
     ESP-MESH (Wi-Fi) <mesh>
     Core Dump <core_dump>
     Event Handling <event-handling>
@@ -29,7 +30,7 @@ API Guides
     :esp32: RF Calibration <RF_calibration>
     ROM debug console <romconsole>
     :esp32: Secure Boot <../security/secure-boot-v1>
-    :esp32: Secure Boot V2 <../security/secure-boot-v2>
+    Secure Boot V2 <../security/secure-boot-v2>
     Thread Local Storage <thread-local-storage>
     Tools <tools/index>
     ULP Coprocessor <ulp>

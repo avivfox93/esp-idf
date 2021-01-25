@@ -50,7 +50,6 @@
 #include "nvs_flash.h"
 #include "esp_event.h"
 #include "esp_spi_flash.h"
-#include "esp_ipc.h"
 #include "esp_private/crosscore_int.h"
 #include "esp_log.h"
 #include "esp_vfs_dev.h"
@@ -100,6 +99,11 @@ struct object {
 };
 void __register_frame_info (const void *begin, struct object *ob);
 extern char __eh_frame[];
+
+#ifdef CONFIG_COMPILER_CXX_EXCEPTIONS
+// workaround for C++ exception large memory allocation
+void _Unwind_SetEnableExceptionFdeSorting(unsigned char enable);
+#endif // CONFIG_COMPILER_CXX_EXCEPTIONS
 
 //If CONFIG_SPIRAM_IGNORE_NOTFOUND is set and external RAM is not found or errors out on testing, this is set to false.
 static bool s_spiram_okay = true;
@@ -201,6 +205,15 @@ void IRAM_ATTR call_start_cpu0(void)
 #endif
 
 #if CONFIG_SPIRAM_FETCH_INSTRUCTIONS
+    extern void instruction_flash_page_info_init(void);
+    instruction_flash_page_info_init();
+#endif
+#if CONFIG_SPIRAM_RODATA
+    extern void rodata_flash_page_info_init(void);
+    rodata_flash_page_info_init();
+#endif
+
+#if CONFIG_SPIRAM_FETCH_INSTRUCTIONS
     extern void esp_spiram_enable_instruction_access(void);
     esp_spiram_enable_instruction_access();
 #endif
@@ -284,9 +297,7 @@ void start_cpu0_default(void)
 #if CONFIG_ESP32S2_BROWNOUT_DET
     esp_brownout_init();
 #endif
-#if CONFIG_ESP32S2_DISABLE_BASIC_ROM_CONSOLE
-    esp_efuse_disable_basic_rom_console();
-#endif
+
     rtc_gpio_force_hold_dis_all();
 
 #ifdef CONFIG_VFS_SUPPORT_IO
@@ -302,6 +313,16 @@ void start_cpu0_default(void)
 #else // defined(CONFIG_VFS_SUPPORT_IO) && !defined(CONFIG_ESP_CONSOLE_UART_NONE)
     _REENT_SMALL_CHECK_INIT(_GLOBAL_REENT);
 #endif // defined(CONFIG_VFS_SUPPORT_IO) && !defined(CONFIG_ESP_CONSOLE_UART_NONE)
+    // After setting _GLOBAL_REENT, ESP_LOGIx can be used instead of ESP_EARLY_LOGx.
+
+#if CONFIG_SECURE_DISABLE_ROM_DL_MODE
+    err = esp_efuse_disable_rom_download_mode();
+    assert(err == ESP_OK && "Failed to disable ROM download mode");
+#endif
+#if CONFIG_SECURE_ENABLE_SECURE_ROM_DL_MODE
+    err = esp_efuse_enable_rom_secure_download_mode();
+    assert(err == ESP_OK && "Failed to enable Secure Download mode");
+#endif
 
     esp_timer_init();
     esp_set_time_from_rtc();
@@ -327,6 +348,12 @@ void start_cpu0_default(void)
 #endif
 
     do_global_ctors();
+
+#ifdef CONFIG_COMPILER_CXX_EXCEPTIONS
+    ESP_EARLY_LOGD(TAG, "Setting C++ exception workarounds.");
+    _Unwind_SetEnableExceptionFdeSorting(0);
+#endif // CONFIG_COMPILER_CXX_EXCEPTIONS
+
 #if CONFIG_ESP_INT_WDT
     esp_int_wdt_init();
     //Initialize the interrupt watch dog

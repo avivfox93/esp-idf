@@ -80,10 +80,13 @@ def main():
     deploy(version, tarball_path, docs_path, docs_server)
 
     print("Docs URLs:")
+    doc_deploy_type = os.getenv('TYPE')
     for vurl in version_urls:
+        language, _, target = vurl.split('/')
+        tag = '{}_{}'.format(language, target)
         url = "{}/{}/index.html".format(url_base, vurl)  # (index.html needed for the preview server)
         url = re.sub(r"([^:])//", r"\1/", url)  # get rid of any // that isn't in the https:// part
-        print(url)
+        print('[document {}][{}] {}'.format(doc_deploy_type, tag, url))
 
     # note: it would be neater to use symlinks for stable, but because of the directory order
     # (language first) it's kind of a pain to do on a remote server, so we just repeat the
@@ -95,7 +98,6 @@ def main():
 
 
 def deploy(version, tarball_path, docs_path, docs_server):
-
     def run_ssh(commands):
         """ Log into docs_server and run a sequence of commands using ssh """
         print("Running ssh: {}".format(commands))
@@ -109,7 +111,7 @@ def deploy(version, tarball_path, docs_path, docs_server):
     tarball_name = os.path.basename(tarball_path)
 
     run_ssh(["cd {}".format(docs_path),
-             "rm -rf ./*/{}".format(version),   # remove any pre-existing docs matching this version
+             "rm -rf ./*/{}".format(version),  # remove any pre-existing docs matching this version
              "tar -zxvf {}".format(tarball_name),  # untar the archive with the new docs
              "rm {}".format(tarball_name)])
 
@@ -202,9 +204,9 @@ def is_stable_version(version):
     if "-" in version:
         return False  # prerelease tag
 
-    git_out = subprocess.run(["git", "tag", "-l"], capture_output=True, check=True)
+    git_out = subprocess.check_output(["git", "tag", "-l"]).decode("utf-8")
 
-    versions = [v.strip() for v in git_out.stdout.decode("utf-8").split("\n")]
+    versions = [v.strip() for v in git_out.split("\n")]
     versions = [v for v in versions if re.match(r"^v[\d\.]+$", v)]  # include vX.Y.Z only
 
     versions = [packaging.version.parse(v) for v in versions]
